@@ -4,17 +4,15 @@ from typing import List, Dict, Any
 import shlex
 import os
 import json
-# 注意：不再使用 copy 拷贝事件，而是直接构造新的事件对象
 
 @register("alias_service", "w33d", "别名管理插件", "1.0.0", "https://github.com/Last-emo-boy/astrbot_plugin_aliases")
 class AliasService(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         self.logger = LogManager.GetLogger("AliasService")
-        # 持久化文件路径，存放在当前插件目录下的 alias_store.json
+        # 存储文件路径：存放在当前插件目录下 alias_store.json
         self.alias_file = os.path.join(os.path.dirname(__file__), "alias_store.json")
         self._store: List[Dict[str, Any]] = self.load_alias_store()
-        # 别名组（如果需要持久化可以扩展此部分，此处仅作临时存储）
         self.alias_groups: Dict[str, List[str]] = {}
 
     def load_alias_store(self) -> List[Dict[str, Any]]:
@@ -73,7 +71,7 @@ class AliasService(Star):
             yield event.plain_result("请输入别名对应的命令")
             return
 
-        # 利用 shlex.split 将输入拆分成 token，然后按“遇到以 '/' 开头的新 token”进行分组
+        # 利用 shlex.split 拆分输入为 tokens，然后按照“以 / 开头”进行分组
         tokens = shlex.split(commands)
         cmds = []
         current_cmd = ""
@@ -132,10 +130,10 @@ class AliasService(Star):
         '''
         监听所有消息，自动执行别名指令（支持命令组合 & 参数传递）。
         当检测到消息以已注册的别名开头时：
-          1. 调用 event.stop_event() 阻止原始事件后续处理（避免触发 LLM 等其它流程）。
+          1. 调用 event.stop_event() 阻止原始事件后续处理。
           2. 为别名对应的每条命令构造新的 AstrMessageEvent 对象，并注入事件队列供后续命令解析执行。
         '''
-        # 如果该事件已被处理过，则跳过
+        # 如果事件已经被处理过则跳过
         if getattr(event, '_alias_processed', False):
             return
 
@@ -147,22 +145,22 @@ class AliasService(Star):
             if message.startswith(alias_name):
                 remaining_args = message[len(alias_name):].strip()
                 self.logger.debug(f"匹配到别名 {alias_name}，剩余参数: {remaining_args}")
-                # 停止原始事件后续处理
-                event.stop_event()
-                # 依次构造新的命令事件并注入队列
+                event.stop_event()  # 终止原始事件传播
+
+                # 依次构造新命令事件并注入队列
                 for cmd in alias["commands"]:
-                    # 如果命令中包含 {args} 占位符则进行替换，否则直接追加剩余参数
-                    full_command = cmd.replace("{args}", remaining_args) if "{args}" in cmd else f"{cmd} {remaining_args}".strip()
-                    self.logger.debug(f"准备注入执行命令: {full_command}")
-                    # 构造新的事件；注意这里只填入必要字段，请根据实际情况补充其它字段
-                    new_event = AstrMessageEvent(
-                        message_str=full_command,
-                        session_id=event.session_id,
-                        unified_msg_origin=event.unified_msg_origin,
-                        raw_message=event.raw_message  # 复用原始消息对象
+                    full_command = (cmd.replace("{args}", remaining_args)
+                                    if "{args}" in cmd
+                                    else f"{cmd} {remaining_args}".strip())
+                    self.logger.debug(f"构造新命令: {full_command}")
+                    # 构造新的 AstrMessageEvent 对象，
+                    # 利用原事件中的 message_obj、platform_meta、session_id
+                    new_event = type(event)(
+                        message_str = full_command,
+                        message_obj = event.message_obj,
+                        platform_meta = event.platform_meta,
+                        session_id = event.session_id
                     )
-                    # 不设置 _alias_processed 标志（或确保为 False），以便新事件能被正常解析
-                    new_event._alias_processed = False
-                    # 注入事件队列（使用 put 以确保异步等待队列处理）
+                    new_event._alias_processed = True
                     await self.context.get_event_queue().put(new_event)
                 return
