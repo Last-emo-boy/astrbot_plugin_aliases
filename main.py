@@ -2,13 +2,12 @@ from astrbot.api.all import *
 from astrbot.core.log import LogManager  # 使用 LogManager 获取 logger
 from typing import List, Dict, Any
 
-@register("alias_service", "Your Name", "别名管理插件（支持命令组合）", "1.2.2", "repo url")
+@register("alias_service", "w33d", "别名管理插件", "1.0.0", "https://github.com/Last-emo-boy/astrbot_plugin_aliases")
 class AliasService(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         self._store: List[Dict[str, Any]] = []  # 存储所有别名
         self.alias_groups: Dict[str, List[str]] = {}  # 记录别名组
-        # 修改此处，使用 LogManager 获取 logger
         self.logger = LogManager.GetLogger("AliasService")
     
     @command("alias.switch")
@@ -78,7 +77,7 @@ class AliasService(Star):
         alias_str = "\n".join([f"{alias['name']} -> {' | '.join(alias['commands'])}" for alias in self._store])
         yield event.plain_result(f"当前别名列表:\n{alias_str}")
 
-    @filter.on_message()  # 这里根据你的 AstrBot 版本修改监听器注册方式
+    @event_message_type(EventMessageType.ALL)
     async def on_message(self, event: AstrMessageEvent):
         '''监听所有消息，自动执行别名指令（支持命令组合 & 参数传递）'''
         if not isinstance(event, AstrMessageEvent):
