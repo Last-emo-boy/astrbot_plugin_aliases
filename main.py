@@ -9,7 +9,7 @@ class AliasService(Star):
         super().__init__(context)
         self._store: List[Dict] = []  # 存储所有别名
         self.alias_groups: Dict[str, List[str]] = {}  # 记录别名组
-        self.logger = context.logger  # 获取日志记录器
+        self.logger = self.context.get_logger("AliasService")  # 修正日志获取方式
 
     @command("alias.switch")
     async def alias_switch(self, event: AstrMessageEvent, group: str = None):
