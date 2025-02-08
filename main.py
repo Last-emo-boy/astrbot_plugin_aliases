@@ -7,7 +7,7 @@ import json
 
 @register("alias_service", "w33d", "别名管理插件", "1.0.0", "https://github.com/Last-emo-boy/astrbot_plugin_aliases")
 class AliasService(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context):
         super().__init__(context)
         self.logger = LogManager.GetLogger("AliasService")
         # 存储文件路径：存放在当前插件目录下 alias_store.json
@@ -37,7 +37,7 @@ class AliasService(Star):
             self.logger.error(f"保存别名存储失败：{e}")
 
     @command("alias.switch")
-    async def alias_switch(self, event: AstrMessageEvent, *, group: str = None):
+    async def alias_switch(self, event, *, group = None):
         '''切换或查询当前频道的别名组'''
         session_id = event.session_id  
         channel_data = self.context.get_channel_data(session_id) or {}
@@ -57,7 +57,7 @@ class AliasService(Star):
         self.logger.debug(f"频道 {session_id} 已切换到别名组 {group}")
 
     @command("alias.add")
-    async def alias_add(self, event: AstrMessageEvent, content: str = "", **kwargs):
+    async def alias_add(self, event, args = "", **kwargs):
         '''
         添加或更新别名，可映射到多个命令。
 
@@ -67,12 +67,12 @@ class AliasService(Star):
         意味着别名 "123" 映射到两个命令，依次执行 "/provider 2" 和 "/reset"。
         如果命令中包含空格，请使用引号包裹。
         '''
-        if not content:
+        if not args:
             yield event.plain_result("请提供别名和至少一个命令，格式如：/alias.add 123 /provider 2 /reset")
             return
 
         # 使用 shlex.split 将输入拆分为 token 列表
-        parts = shlex.split(content)
+        parts = shlex.split(args)
         if len(parts) < 2:
             yield event.plain_result("请提供别名和至少一个命令")
             return
@@ -113,7 +113,7 @@ class AliasService(Star):
         self.save_alias_store()
 
     @command("alias.remove")
-    async def alias_remove(self, event: AstrMessageEvent, *, name: str):
+    async def alias_remove(self, event, *, name):
         '''删除别名'''
         before_count = len(self._store)
         self._store = [alias for alias in self._store if alias.get("name") != name]
@@ -125,7 +125,7 @@ class AliasService(Star):
             yield event.plain_result(f"别名 {name} 不存在")
 
     @command("alias.list")
-    async def alias_list(self, event: AstrMessageEvent):
+    async def alias_list(self, event):
         '''列出所有别名'''
         if not self._store:
             yield event.plain_result("当前没有别名")
@@ -134,7 +134,7 @@ class AliasService(Star):
         yield event.plain_result(f"当前别名列表:\n{alias_str}")
 
     @event_message_type(EventMessageType.ALL)
-    async def on_message(self, event: AstrMessageEvent):
+    async def on_message(self, event):
         '''
         监听所有消息，自动执行别名指令（支持命令组合 & 参数传递）。
         当检测到消息以已注册的别名开头时：
