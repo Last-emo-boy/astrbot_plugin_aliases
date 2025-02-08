@@ -57,7 +57,7 @@ class AliasService(Star):
         self.logger.debug(f"频道 {session_id} 已切换到别名组 {group}")
 
     @command("alias.add")
-    async def alias_add(self, event: AstrMessageEvent, name: str, *commands: str):
+    async def alias_add(self, event: AstrMessageEvent, args: str):
         '''
         添加或更新别名，可映射到多个命令。
         
@@ -67,16 +67,24 @@ class AliasService(Star):
         意味着别名 "123" 映射到两个命令：先执行 "/provider 2"，再执行 "/reset"。
         如果命令中包含空格，请使用引号包裹。
         '''
-        if not commands:
-            yield event.plain_result("请输入别名对应的命令")
+        if not args:
+            yield event.plain_result("请输入别名以及对应的命令，格式如：/alias.add 123 /provider 2 /reset")
             return
 
-        # 将 *commands 组合成一个完整字符串，再用 shlex.split 拆分出各个 token
-        commands_str = " ".join(commands)
-        tokens = shlex.split(commands_str)
+        # 使用 shlex.split 解析输入内容
+        parts = shlex.split(args)
+        if len(parts) < 2:
+            yield event.plain_result("请提供别名和至少一个命令")
+            return
+
+        alias_name = parts[0]
+        # 将余下部分组合成命令字符串
+        commands_input = " ".join(parts[1:])
+        # 按照“遇到以 '/' 开头的新 token”为规则拆分为多个命令
         cmds = []
         current_cmd = ""
-        for token in tokens:
+        # 遍历从第二个 token 开始的列表
+        for token in parts[1:]:
             if token.startswith("/") and current_cmd:
                 cmds.append(current_cmd.strip())
                 current_cmd = token
@@ -90,20 +98,20 @@ class AliasService(Star):
 
         updated = False
         for alias in self._store:
-            if alias.get("name") == name:
+            if alias.get("name") == alias_name:
                 alias["commands"] = cmds
                 updated = True
                 break
         if updated:
-            yield event.plain_result(f"别名 {name} 已更新")
-            self.logger.debug(f"更新别名 {name}: {cmds}")
+            yield event.plain_result(f"别名 {alias_name} 已更新")
+            self.logger.debug(f"更新别名 {alias_name}: {cmds}")
         else:
             self._store.append({
-                "name": name,
+                "name": alias_name,
                 "commands": cmds
             })
-            yield event.plain_result(f"成功添加别名 {name}")
-            self.logger.debug(f"新增别名 {name}: {cmds}")
+            yield event.plain_result(f"成功添加别名 {alias_name}")
+            self.logger.debug(f"新增别名 {alias_name}: {cmds}")
         self.save_alias_store()
 
     @command("alias.remove")
@@ -135,7 +143,7 @@ class AliasService(Star):
           1. 调用 event.stop_event() 阻止原始事件后续处理。
           2. 为别名对应的每条命令构造新的 AstrMessageEvent 对象，并注入事件队列供后续命令解析执行。
         '''
-        # 如果事件已经被处理过则跳过
+        # 如果该事件已被处理过则跳过
         if getattr(event, '_alias_processed', False):
             return
 
@@ -155,7 +163,7 @@ class AliasService(Star):
                                     if "{args}" in cmd
                                     else f"{cmd} {remaining_args}".strip())
                     self.logger.debug(f"构造新命令: {full_command}")
-                    # 构造新的 AstrMessageEvent 对象，传入必要的字段
+                    # 构造新的 AstrMessageEvent 对象（根据你提供的构造函数参数）
                     new_event = AstrMessageEvent(
                         message_str = full_command,
                         message_obj = event.message_obj,
