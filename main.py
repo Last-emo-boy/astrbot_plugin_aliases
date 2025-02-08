@@ -84,8 +84,8 @@ class AliasService(Star):
     @event_message_type(EventMessageType.ALL)
     async def on_message(self, event: AstrMessageEvent):
         '''监听所有消息，自动执行别名指令（支持命令组合 & 参数传递）'''
-        if not isinstance(event, AstrMessageEvent):
-            self.logger.error("on_message 事件参数错误，event 不是 AstrMessageEvent")
+        # 防止对已经由别名处理过的消息再次处理
+        if getattr(event, '_alias_processed', False):
             return
 
         message = event.message_str.strip()
@@ -98,11 +98,13 @@ class AliasService(Star):
                 self.logger.debug(f"匹配到别名 {alias_name}，参数: {remaining_args}")
 
                 for cmd in alias["commands"]:
-                    # 替换 {args} 占位符，如果没有则直接追加参数
+                    # 支持 {args} 占位符替换，如果没有则直接追加参数
                     full_command = cmd.replace("{args}", remaining_args) if "{args}" in cmd else f"{cmd} {remaining_args}".strip()
                     self.logger.debug(f"准备执行命令: {full_command}")
-                    # 通过复制事件并修改消息内容，将命令重新注入事件队列
-                    new_event = copy.deepcopy(event)
+                    # 使用浅拷贝，不会递归复制内部的不可复制对象
+                    new_event = copy.copy(event)
                     new_event.message_str = full_command
+                    # 标记该事件已由别名处理，防止无限循环
+                    new_event._alias_processed = True
                     await self.context.get_event_queue().put(new_event)
                 return
