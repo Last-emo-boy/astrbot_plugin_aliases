@@ -1,7 +1,5 @@
 from astrbot.api.all import *
 from astrbot.core.log import LogManager  # 使用 LogManager 获取 logger
-from typing import List, Dict, Any
-import shlex
 import os
 import json
 
@@ -12,10 +10,10 @@ class AliasService(Star):
         self.logger = LogManager.GetLogger("AliasService")
         # 存储文件路径：存放在当前插件目录下 alias_store.json
         self.alias_file = os.path.join(os.path.dirname(__file__), "alias_store.json")
-        self._store: List[Dict[str, Any]] = self.load_alias_store()
-        self.alias_groups: Dict[str, List[str]] = {}
+        self._store = self.load_alias_store()  # 别名存储，列表，每个元素为 {"name": str, "commands": [str,...]}
+        self.alias_groups = {}
 
-    def load_alias_store(self) -> List[Dict[str, Any]]:
+    def load_alias_store(self):
         if os.path.exists(self.alias_file):
             try:
                 with open(self.alias_file, "r", encoding="utf8") as f:
@@ -57,7 +55,7 @@ class AliasService(Star):
         self.logger.debug(f"频道 {session_id} 已切换到别名组 {group}")
 
     @command("alias.add")
-    async def alias_add(self, event: AstrMessageEvent, args: str = ""):
+    async def alias_add(self, event: AstrMessageEvent, *args: str):
         '''
         添加或更新别名，可映射到多个命令。
 
@@ -67,19 +65,13 @@ class AliasService(Star):
         意味着别名 "123" 映射到两个命令，依次执行 "/provider 2" 和 "/reset"。
         如果命令中包含空格，请使用引号包裹。
         '''
-        if not args:
-            yield event.plain_result("请提供别名和至少一个命令，格式如：/alias.add 123 /provider 2 /reset")
-            return
-
-        # 使用 shlex.split 将输入拆分为 token 列表
-        parts = shlex.split(args)
-        if len(parts) < 2:
+        if len(args) < 2:
             yield event.plain_result("请提供别名和至少一个命令")
             return
 
-        alias_name = parts[0]
-        # 将剩余部分组合成命令字符串，再按“遇到以 '/' 开头的新 token”进行拆分
-        tokens = shlex.split(" ".join(parts[1:]))
+        alias_name = args[0]
+        tokens = args[1:]
+        # 规则：遇到以 "/" 开头的 token 表示新命令的开始
         cmds = []
         current_cmd = ""
         for token in tokens:
@@ -160,10 +152,10 @@ class AliasService(Star):
                                     else f"{cmd} {remaining_args}".strip())
                     self.logger.debug(f"构造新命令: {full_command}")
                     new_event = AstrMessageEvent(
-                        message_str=full_command,
-                        message_obj=event.message_obj,
-                        platform_meta=event.platform_meta,
-                        session_id=event.session_id
+                        message_str = full_command,
+                        message_obj = event.message_obj,
+                        platform_meta = event.platform_meta,
+                        session_id = event.session_id
                     )
                     new_event._alias_processed = False
                     await self.context.get_event_queue().put(new_event)
