@@ -37,7 +37,7 @@ class AliasService(Star):
             self.logger.error(f"保存别名存储失败：{e}")
 
     @command("alias.switch")
-    async def alias_switch(self, event, *, group = None):
+    async def alias_switch(self, event: AstrMessageEvent, *, group: str = None):
         '''切换或查询当前频道的别名组'''
         session_id = event.session_id  
         channel_data = self.context.get_channel_data(session_id) or {}
@@ -57,7 +57,7 @@ class AliasService(Star):
         self.logger.debug(f"频道 {session_id} 已切换到别名组 {group}")
 
     @command("alias.add")
-    async def alias_add(self, event, args = "", **kwargs):
+    async def alias_add(self, event: AstrMessageEvent, args: str = ""):
         '''
         添加或更新别名，可映射到多个命令。
 
@@ -113,7 +113,7 @@ class AliasService(Star):
         self.save_alias_store()
 
     @command("alias.remove")
-    async def alias_remove(self, event, *, name):
+    async def alias_remove(self, event: AstrMessageEvent, *, name: str):
         '''删除别名'''
         before_count = len(self._store)
         self._store = [alias for alias in self._store if alias.get("name") != name]
@@ -125,7 +125,7 @@ class AliasService(Star):
             yield event.plain_result(f"别名 {name} 不存在")
 
     @command("alias.list")
-    async def alias_list(self, event):
+    async def alias_list(self, event: AstrMessageEvent):
         '''列出所有别名'''
         if not self._store:
             yield event.plain_result("当前没有别名")
@@ -134,7 +134,7 @@ class AliasService(Star):
         yield event.plain_result(f"当前别名列表:\n{alias_str}")
 
     @event_message_type(EventMessageType.ALL)
-    async def on_message(self, event):
+    async def on_message(self, event: AstrMessageEvent):
         '''
         监听所有消息，自动执行别名指令（支持命令组合 & 参数传递）。
         当检测到消息以已注册的别名开头时：
@@ -160,10 +160,10 @@ class AliasService(Star):
                                     else f"{cmd} {remaining_args}".strip())
                     self.logger.debug(f"构造新命令: {full_command}")
                     new_event = AstrMessageEvent(
-                        message_str = full_command,
-                        message_obj = event.message_obj,
-                        platform_meta = event.platform_meta,
-                        session_id = event.session_id
+                        message_str=full_command,
+                        message_obj=event.message_obj,
+                        platform_meta=event.platform_meta,
+                        session_id=event.session_id
                     )
                     new_event._alias_processed = False
                     await self.context.get_event_queue().put(new_event)
