@@ -98,7 +98,7 @@ class AliasService(Star):
         yield event.reply('\n'.join(response))
 
     @event_message_type(EventMessageType.ALL)
-    @filter.command_process(priority=999)  # 高优先级处理
+    @command(priority=999)  # 高优先级处理
     async def alias_handler(self, event: AstrMessageEvent):
         '''处理别名替换'''
         if getattr(event, '_alias_processed', False):
