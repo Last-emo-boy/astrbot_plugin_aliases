@@ -11,7 +11,7 @@ class AliasService(Star):
         self.logger = LogManager.GetLogger("AliasService")
         # 存储文件路径：当前插件目录下 alias_store.json
         self.alias_file = os.path.join(os.path.dirname(__file__), "alias_store.json")
-        self._store = self.load_alias_store()  # 别名数据，格式为列表，每个元素为 {"name": str, "commands": [str, ...]}
+        self._store = self.load_alias_store()  # 别名数据：列表，每个元素为 {"name": str, "commands": [str, ...]}
         self.alias_groups = {}
 
     def load_alias_store(self):
@@ -56,34 +56,28 @@ class AliasService(Star):
         self.logger.debug(f"频道 {session_id} 已切换到别名组 {group}")
 
     @command("alias.add")
-    async def alias_add(self, event: AstrMessageEvent, content: str = ""):
+    async def alias_add(self, event: AstrMessageEvent, alias_name: str, *cmds: str):
         '''
         添加或更新别名，可映射到多个命令。
 
         示例：
-          /alias.add 123 "/provider 2 /reset"
+          /alias.add 123 /provider 2 /reset
 
         意味着别名 "123" 映射到两个命令，依次执行 "/provider 2" 和 "/reset"。
         如果命令中包含空格，请使用引号包裹。
         '''
-        if not content:
-            yield event.plain_result("请提供别名和至少一个命令，格式如：/alias.add 123 \"/provider 2 /reset\"")
-            return
-
-        # 使用 shlex.split 将 content 拆分为 token 列表
-        parts = shlex.split(content)
-        if len(parts) < 2:
+        if not alias_name or not cmds:
             yield event.plain_result("请提供别名和至少一个命令")
             return
 
-        alias_name = parts[0]
-        # 将剩余部分组合成命令字符串，再根据遇到以 '/' 开头拆分为多个命令
-        tokens = shlex.split(" ".join(parts[1:]))
-        cmds = []
+        # 将 cmds 元组合并为一个字符串，然后用 shlex.split 拆分（以便支持命令中含有空格的情况）
+        command_str = " ".join(cmds)
+        tokens = shlex.split(command_str)
+        commands_list = []
         current_cmd = ""
         for token in tokens:
             if token.startswith("/") and current_cmd:
-                cmds.append(current_cmd.strip())
+                commands_list.append(current_cmd.strip())
                 current_cmd = token
             else:
                 if current_cmd:
@@ -91,24 +85,24 @@ class AliasService(Star):
                 else:
                     current_cmd = token
         if current_cmd:
-            cmds.append(current_cmd.strip())
+            commands_list.append(current_cmd.strip())
 
         updated = False
         for alias in self._store:
             if alias.get("name") == alias_name:
-                alias["commands"] = cmds
+                alias["commands"] = commands_list
                 updated = True
                 break
         if updated:
             yield event.plain_result(f"别名 {alias_name} 已更新")
-            self.logger.debug(f"更新别名 {alias_name}: {cmds}")
+            self.logger.debug(f"更新别名 {alias_name}: {commands_list}")
         else:
             self._store.append({
                 "name": alias_name,
-                "commands": cmds
+                "commands": commands_list
             })
             yield event.plain_result(f"成功添加别名 {alias_name}")
-            self.logger.debug(f"新增别名 {alias_name}: {cmds}")
+            self.logger.debug(f"新增别名 {alias_name}: {commands_list}")
         self.save_alias_store()
 
     @command("alias.remove")
