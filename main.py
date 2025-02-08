@@ -12,7 +12,7 @@ class AliasService(Star):
         self.logger = LogManager.GetLogger("AliasService")
     
     @command("alias.switch")
-    async def alias_switch(self, event: AstrMessageEvent, ctx: Context, *, group: str = None):
+    async def alias_switch(self, event: AstrMessageEvent, *, group: str = None):
         '''切换或查询当前频道的别名组'''
         session_id = event.session_id  
         channel_data = self.context.get_channel_data(session_id) or {}
@@ -36,7 +36,7 @@ class AliasService(Star):
         self.logger.debug(f"频道 {session_id} 已切换到别名组 {group}")
 
     @command("alias.add")
-    async def alias_add(self, event: AstrMessageEvent, ctx: Context, *, name: str, commands: str):
+    async def alias_add(self, event: AstrMessageEvent, *, name: str, commands: str):
         '''添加或更新别名，可映射到多个命令。
         多个命令请用空格分隔，如果命令中包含空格请使用引号包裹。'''
         if not commands:
@@ -60,7 +60,7 @@ class AliasService(Star):
         self.logger.debug(f"新增别名 {name}: {commands_list}")
 
     @command("alias.remove")
-    async def alias_remove(self, event: AstrMessageEvent, ctx: Context, *, name: str):
+    async def alias_remove(self, event: AstrMessageEvent, *, name: str):
         '''删除别名'''
         before_count = len(self._store)
         self._store = [alias for alias in self._store if alias.get("name") != name]
@@ -71,7 +71,7 @@ class AliasService(Star):
             yield event.plain_result(f"别名 {name} 不存在")
 
     @command("alias.list")
-    async def alias_list(self, event: AstrMessageEvent, ctx: Context):
+    async def alias_list(self, event: AstrMessageEvent):
         '''列出所有别名'''
         if not self._store:
             yield event.plain_result("当前没有别名")
@@ -80,7 +80,7 @@ class AliasService(Star):
         alias_str = "\n".join([f"{alias['name']} -> {' | '.join(alias['commands'])}" for alias in self._store])
         yield event.plain_result(f"当前别名列表:\n{alias_str}")
 
-    # 事件监听器可以直接定义为类的方法（如果框架不要求通过装饰器注册）
+    # 事件监听器直接定义为类的方法
     async def on_message(self, event: AstrMessageEvent):
         '''监听所有消息，自动执行别名指令（支持命令组合 & 参数传递）'''
         if not isinstance(event, AstrMessageEvent):
