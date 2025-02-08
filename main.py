@@ -57,7 +57,7 @@ class AliasService(Star):
         self.logger.debug(f"频道 {session_id} 已切换到别名组 {group}")
 
     @command("alias.add")
-    async def alias_add(self, event: AstrMessageEvent, content: str, **kwargs):
+    async def alias_add(self, event: AstrMessageEvent, content: str = "", **kwargs):
         '''
         添加或更新别名，可映射到多个命令。
 
@@ -159,7 +159,6 @@ class AliasService(Star):
                                     if "{args}" in cmd
                                     else f"{cmd} {remaining_args}".strip())
                     self.logger.debug(f"构造新命令: {full_command}")
-                    # 构造新的 AstrMessageEvent 对象，传入必要字段
                     new_event = AstrMessageEvent(
                         message_str = full_command,
                         message_obj = event.message_obj,
