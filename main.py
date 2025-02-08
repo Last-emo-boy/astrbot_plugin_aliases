@@ -97,8 +97,11 @@ class AliasService(Star):
                 self.logger.debug(f"匹配到别名 {alias_name}，参数: {remaining_args}")
 
                 for cmd in alias["commands"]:
-                    # 支持 {args} 占位符替换，如果没有则直接追加参数
+                    # 替换 {args} 占位符，如果没有则直接追加参数
                     full_command = cmd.replace("{args}", remaining_args) if "{args}" in cmd else f"{cmd} {remaining_args}".strip()
-                    self.logger.debug(f"执行命令: {full_command}")
-                    await self.context.send_message(event.unified_msg_origin, MessageChain().message(full_command))
+                    self.logger.debug(f"准备执行命令: {full_command}")
+                    # 通过复制事件并修改消息内容，将命令重新注入事件队列
+                    new_event = copy.deepcopy(event)
+                    new_event.message_str = full_command
+                    await self.context.get_event_queue().put(new_event)
                 return
