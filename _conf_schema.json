@@ -1,0 +1,14 @@
+{
+    "max_aliases": {
+        "type": "int",
+        "description": "最大别名数量",
+        "default": 50,
+        "hint": "防止滥用设置的别名数量上限"
+    },
+    "allow_cross_group": {
+        "type": "bool",
+        "description": "允许跨组使用别名",
+        "default": false,
+        "hint": "启用后频道可以使用所有别名组"
+    }
+}
