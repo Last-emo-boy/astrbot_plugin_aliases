@@ -2,7 +2,7 @@ from astrbot.api.all import *
 from astrbot.core.log import LogManager  # 使用 LogManager 获取 logger
 from typing import List, Dict, Any
 import shlex  # 用于解析带引号的命令参数
-import copy  # 用于深拷贝事件对象
+import copy   # 用于浅拷贝事件对象
 
 @register("alias_service", "w33d", "别名管理插件", "1.0.0", "https://github.com/Last-emo-boy/astrbot_plugin_aliases")
 class AliasService(Star):
@@ -17,49 +17,67 @@ class AliasService(Star):
         '''切换或查询当前频道的别名组'''
         session_id = event.session_id  
         channel_data = self.context.get_channel_data(session_id) or {}
-
         if not group:
             current_groups = channel_data.get("aliasGroups", [])
             yield event.plain_result(f"当前频道的别名组: {', '.join(current_groups) if current_groups else '无'}")
             return
-
         if group not in self.alias_groups:
             yield event.plain_result("未找到对应的别名组")
             return
-
         if group in channel_data.get("aliasGroups", []):
             yield event.plain_result(f"频道已在别名组 {group}，未改动")
             return
-
         channel_data["aliasGroups"] = [group]
         self.context.update_channel_data(session_id, channel_data)
         yield event.plain_result(f"成功切换到别名组 {group}")
         self.logger.debug(f"频道 {session_id} 已切换到别名组 {group}")
-
+    
     @command("alias.add")
     async def alias_add(self, event: AstrMessageEvent, *, name: str, commands: str):
         '''添加或更新别名，可映射到多个命令。
-        多个命令请用空格分隔，如果命令中包含空格请使用引号包裹。'''
+        
+        示例：
+        /alias.add 123 /provider 2 /reset
+        
+        意味着别名 "123" 映射到两个命令：先执行 "/provider 2"，再执行 "/reset"。
+        如果命令中包含空格，请使用引号包裹。'''
         if not commands:
             yield event.plain_result("请输入别名对应的命令")
             return
 
-        # 使用 shlex.split 支持引号包裹的参数，得到多个命令
-        commands_list = shlex.split(commands)
+        # 使用 shlex.split 解析参数，得到各个 token
+        tokens = shlex.split(commands)
+        cmds = []
+        current_cmd = ""
+        for token in tokens:
+            # 当遇到以 "/" 开头的 token 且当前已有命令内容时，视为新命令开始
+            if token.startswith("/") and current_cmd:
+                cmds.append(current_cmd.strip())
+                current_cmd = token
+            else:
+                # 否则追加到当前命令
+                if current_cmd:
+                    current_cmd += " " + token
+                else:
+                    current_cmd = token
+        if current_cmd:
+            cmds.append(current_cmd.strip())
+        
+        # 保存别名（更新或新增）
         for alias in self._store:
             if alias.get("name") == name:
-                alias["commands"] = commands_list
+                alias["commands"] = cmds
                 yield event.plain_result(f"别名 {name} 已更新")
-                self.logger.debug(f"更新别名 {name}: {commands_list}")
+                self.logger.debug(f"更新别名 {name}: {cmds}")
                 return
 
         self._store.append({
             "name": name,
-            "commands": commands_list
+            "commands": cmds
         })
         yield event.plain_result(f"成功添加别名 {name}")
-        self.logger.debug(f"新增别名 {name}: {commands_list}")
-
+        self.logger.debug(f"新增别名 {name}: {cmds}")
+    
     @command("alias.remove")
     async def alias_remove(self, event: AstrMessageEvent, *, name: str):
         '''删除别名'''
@@ -70,21 +88,20 @@ class AliasService(Star):
             self.logger.debug(f"删除别名 {name}")
         else:
             yield event.plain_result(f"别名 {name} 不存在")
-
+    
     @command("alias.list")
     async def alias_list(self, event: AstrMessageEvent):
         '''列出所有别名'''
         if not self._store:
             yield event.plain_result("当前没有别名")
             return
-
         alias_str = "\n".join([f"{alias['name']} -> {' | '.join(alias['commands'])}" for alias in self._store])
         yield event.plain_result(f"当前别名列表:\n{alias_str}")
-
+    
     @event_message_type(EventMessageType.ALL)
     async def on_message(self, event: AstrMessageEvent):
         '''监听所有消息，自动执行别名指令（支持命令组合 & 参数传递）'''
-        # 防止对已经由别名处理过的消息再次处理
+        # 如果事件已被别名处理，则跳过
         if getattr(event, '_alias_processed', False):
             return
 
@@ -96,15 +113,15 @@ class AliasService(Star):
             if message.startswith(alias_name):
                 remaining_args = message[len(alias_name):].strip()
                 self.logger.debug(f"匹配到别名 {alias_name}，参数: {remaining_args}")
-
+                # 阻止原始事件的后续处理，避免触发 LLM 等其它流程
+                event.stop_event()
                 for cmd in alias["commands"]:
-                    # 支持 {args} 占位符替换，如果没有则直接追加参数
+                    # 如果命令中包含 {args} 占位符则替换，否则直接追加剩余参数
                     full_command = cmd.replace("{args}", remaining_args) if "{args}" in cmd else f"{cmd} {remaining_args}".strip()
                     self.logger.debug(f"准备执行命令: {full_command}")
-                    # 使用浅拷贝，不会递归复制内部的不可复制对象
+                    # 使用浅拷贝创建新事件，防止无限循环处理
                     new_event = copy.copy(event)
                     new_event.message_str = full_command
-                    # 标记该事件已由别名处理，防止无限循环
                     new_event._alias_processed = True
                     await self.context.get_event_queue().put(new_event)
                 return
