@@ -2,15 +2,16 @@ from astrbot.api.all import *
 from astrbot.core.log import LogManager  # 使用 LogManager 获取 logger
 import os
 import json
+import shlex
 
 @register("alias_service", "w33d", "别名管理插件", "1.0.0", "https://github.com/Last-emo-boy/astrbot_plugin_aliases")
 class AliasService(Star):
-    def __init__(self, context):
+    def __init__(self, context: Context):
         super().__init__(context)
         self.logger = LogManager.GetLogger("AliasService")
         # 存储文件路径：存放在当前插件目录下 alias_store.json
         self.alias_file = os.path.join(os.path.dirname(__file__), "alias_store.json")
-        self._store = self.load_alias_store()  # 别名存储，列表，每个元素为 {"name": str, "commands": [str,...]}
+        self._store = self.load_alias_store()  # 别名存储：列表，每个元素为 {"name": str, "commands": [str,...]}
         self.alias_groups = {}
 
     def load_alias_store(self):
@@ -37,7 +38,7 @@ class AliasService(Star):
     @command("alias.switch")
     async def alias_switch(self, event: AstrMessageEvent, *, group: str = None):
         '''切换或查询当前频道的别名组'''
-        session_id = event.session_id  
+        session_id = event.session_id
         channel_data = self.context.get_channel_data(session_id) or {}
         if not group:
             current_groups = channel_data.get("aliasGroups", [])
@@ -55,7 +56,7 @@ class AliasService(Star):
         self.logger.debug(f"频道 {session_id} 已切换到别名组 {group}")
 
     @command("alias.add")
-    async def alias_add(self, event: AstrMessageEvent, *args: str):
+    async def alias_add(self, event: AstrMessageEvent, args: str = ""):
         '''
         添加或更新别名，可映射到多个命令。
 
@@ -65,13 +66,19 @@ class AliasService(Star):
         意味着别名 "123" 映射到两个命令，依次执行 "/provider 2" 和 "/reset"。
         如果命令中包含空格，请使用引号包裹。
         '''
-        if len(args) < 2:
+        if not args:
+            yield event.plain_result("请提供别名和至少一个命令，格式如：/alias.add 123 /provider 2 /reset")
+            return
+
+        # 使用 shlex.split 将输入拆分为 token 列表
+        parts = shlex.split(args)
+        if len(parts) < 2:
             yield event.plain_result("请提供别名和至少一个命令")
             return
 
-        alias_name = args[0]
-        tokens = args[1:]
-        # 规则：遇到以 "/" 开头的 token 表示新命令的开始
+        alias_name = parts[0]
+        # 将剩余部分组合成命令字符串，再按“遇到以 '/' 开头的新 token”进行拆分
+        tokens = shlex.split(" ".join(parts[1:]))
         cmds = []
         current_cmd = ""
         for token in tokens:
