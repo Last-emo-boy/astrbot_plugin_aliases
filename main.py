@@ -3,7 +3,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from typing import List, Dict
 
-@register("alias_service", "Your Name", "别名管理插件（支持命令组合）", "1.2.0", "repo url")
+@register("alias_service", "w33d", "", "1.0.0", "https://github.com/Last-emo-boy/astrbot_plugin_aliases")
 class AliasService(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -81,12 +81,16 @@ class AliasService(Star):
     @event_message_type(EventMessageType.ALL)
     async def on_message(self, event: AstrMessageEvent):
         '''监听所有消息，自动执行别名指令（支持命令组合 & 参数传递）'''
+        if not isinstance(event, AstrMessageEvent):  # 确保 event 不是 Context
+            self.logger.error("on_message 事件参数错误，event 不是 AstrMessageEvent")
+            return
+
         message = event.message_str.strip()
         self.logger.debug(f"收到消息: {message}")
 
         for alias in self._store:
             if message.startswith(alias["name"]):
-                remaining_args = message[len(alias["name"]):].strip()  # 解析剩余参数
+                remaining_args = message[len(alias["name"]):].strip()
                 self.logger.debug(f"匹配到别名 {alias['name']}，参数: {remaining_args}")
 
                 # 处理多条命令，每条命令可能带有 `{args}` 占位符
@@ -95,4 +99,4 @@ class AliasService(Star):
                     self.logger.debug(f"执行命令: {full_command}")
                     await self.context.send_message(event.unified_msg_origin, MessageChain().message(full_command))
 
-                return  # 执行完别名对应的所有命令后返回
+                return  # 只执行第一个匹配的别名
