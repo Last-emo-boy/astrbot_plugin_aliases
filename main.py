@@ -125,7 +125,8 @@ class AliasService(Star):
             return
         alias_str = "\n".join([f"{alias['name']} -> {' | '.join(alias['commands'])}" for alias in self._store])
         yield event.plain_result(f"当前别名列表:\n{alias_str}")
-
+    
+    @event_message_type(EventMessageType.ALL)
     async def on_message(self, event: AstrMessageEvent):
         '''
         监听所有消息，自动执行别名指令（支持命令组合 & 参数传递）。
