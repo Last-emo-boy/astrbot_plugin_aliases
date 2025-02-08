@@ -37,25 +37,24 @@ class AliasService(Star):
         '''添加或更新别名，可映射到多个命令。
         
         示例：
-        /alias.add 123 /provider 2 /reset
+          /alias.add 123 /provider 2 /reset
         
-        意味着别名 "123" 映射到两个命令：先执行 "/provider 2"，再执行 "/reset"。
+        意味着别名 "123" 映射到两个命令，依次执行 “/provider 2” 和 “/reset”。
         如果命令中包含空格，请使用引号包裹。'''
         if not commands:
             yield event.plain_result("请输入别名对应的命令")
             return
 
-        # 使用 shlex.split 解析参数，得到各个 token
+        # 使用 shlex.split 解析输入，拆分为若干 token
         tokens = shlex.split(commands)
         cmds = []
         current_cmd = ""
         for token in tokens:
-            # 当遇到以 "/" 开头的 token 且当前已有命令内容时，视为新命令开始
+            # 当遇到以 "/" 开头的 token 且当前已有内容时，认为是新命令的开始
             if token.startswith("/") and current_cmd:
                 cmds.append(current_cmd.strip())
                 current_cmd = token
             else:
-                # 否则追加到当前命令
                 if current_cmd:
                     current_cmd += " " + token
                 else:
@@ -63,7 +62,7 @@ class AliasService(Star):
         if current_cmd:
             cmds.append(current_cmd.strip())
         
-        # 保存别名（更新或新增）
+        # 更新或新增别名记录
         for alias in self._store:
             if alias.get("name") == name:
                 alias["commands"] = cmds
@@ -101,7 +100,7 @@ class AliasService(Star):
     @event_message_type(EventMessageType.ALL)
     async def on_message(self, event: AstrMessageEvent):
         '''监听所有消息，自动执行别名指令（支持命令组合 & 参数传递）'''
-        # 如果事件已被别名处理，则跳过
+        # 如果事件已经被别名处理过，则直接跳过
         if getattr(event, '_alias_processed', False):
             return
 
@@ -113,15 +112,17 @@ class AliasService(Star):
             if message.startswith(alias_name):
                 remaining_args = message[len(alias_name):].strip()
                 self.logger.debug(f"匹配到别名 {alias_name}，参数: {remaining_args}")
-                # 阻止原始事件的后续处理，避免触发 LLM 等其它流程
+                # 阻止原始事件的进一步传播（避免触发 LLM 等其它流程）
                 event.stop_event()
+                # 按顺序依次注入所有映射的命令事件
                 for cmd in alias["commands"]:
                     # 如果命令中包含 {args} 占位符则替换，否则直接追加剩余参数
                     full_command = cmd.replace("{args}", remaining_args) if "{args}" in cmd else f"{cmd} {remaining_args}".strip()
                     self.logger.debug(f"准备执行命令: {full_command}")
-                    # 使用浅拷贝创建新事件，防止无限循环处理
+                    # 使用浅拷贝创建新的事件对象
                     new_event = copy.copy(event)
                     new_event.message_str = full_command
-                    new_event._alias_processed = True
-                    await self.context.get_event_queue().put(new_event)
+                    new_event._alias_processed = True  # 标记以防止再次触发别名处理
+                    # 直接放入事件队列（这里采用 put_nowait，无需 await）
+                    self.context.get_event_queue().put_nowait(new_event)
                 return
