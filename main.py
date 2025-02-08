@@ -57,7 +57,7 @@ class AliasService(Star):
         self.logger.debug(f"频道 {session_id} 已切换到别名组 {group}")
 
     @command("alias.add")
-    async def alias_add(self, event: AstrMessageEvent, args: str, **kwargs):
+    async def alias_add(self, event: AstrMessageEvent, content: str = "", **kwargs):
         '''
         添加或更新别名，可映射到多个命令。
 
@@ -67,12 +67,12 @@ class AliasService(Star):
         意味着别名 "123" 映射到两个命令，依次执行 "/provider 2" 和 "/reset"。
         如果命令中包含空格，请使用引号包裹。
         '''
-        if not args:
+        if not content:
             yield event.plain_result("请提供别名和至少一个命令，格式如：/alias.add 123 /provider 2 /reset")
             return
 
         # 使用 shlex.split 将输入拆分为 token 列表
-        parts = shlex.split(args)
+        parts = shlex.split(content)
         if len(parts) < 2:
             yield event.plain_result("请提供别名和至少一个命令")
             return
