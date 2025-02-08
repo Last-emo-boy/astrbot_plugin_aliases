@@ -57,22 +57,23 @@ class AliasService(Star):
         self.logger.debug(f"频道 {session_id} 已切换到别名组 {group}")
 
     @command("alias.add")
-    async def alias_add(self, event: AstrMessageEvent, *, name: str, commands: str):
+    async def alias_add(self, event: AstrMessageEvent, name: str, *commands: str):
         '''
         添加或更新别名，可映射到多个命令。
         
         示例：
           /alias.add 123 /provider 2 /reset
-        
-        意味着别名 "123" 映射到两个命令，依次执行 “/provider 2” 和 “/reset”。
+          
+        意味着别名 "123" 映射到两个命令：先执行 "/provider 2"，再执行 "/reset"。
         如果命令中包含空格，请使用引号包裹。
         '''
         if not commands:
             yield event.plain_result("请输入别名对应的命令")
             return
 
-        # 利用 shlex.split 拆分输入为 tokens，然后按照“以 / 开头”进行分组
-        tokens = shlex.split(commands)
+        # 将 *commands 组合成一个完整字符串，再用 shlex.split 拆分出各个 token
+        commands_str = " ".join(commands)
+        tokens = shlex.split(commands_str)
         cmds = []
         current_cmd = ""
         for token in tokens:
@@ -125,7 +126,7 @@ class AliasService(Star):
             return
         alias_str = "\n".join([f"{alias['name']} -> {' | '.join(alias['commands'])}" for alias in self._store])
         yield event.plain_result(f"当前别名列表:\n{alias_str}")
-    
+
     @event_message_type(EventMessageType.ALL)
     async def on_message(self, event: AstrMessageEvent):
         '''
@@ -148,20 +149,19 @@ class AliasService(Star):
                 self.logger.debug(f"匹配到别名 {alias_name}，剩余参数: {remaining_args}")
                 event.stop_event()  # 终止原始事件传播
 
-                # 依次构造新命令事件并注入队列
                 for cmd in alias["commands"]:
+                    # 如果命令中包含 {args} 占位符则替换，否则直接追加剩余参数
                     full_command = (cmd.replace("{args}", remaining_args)
                                     if "{args}" in cmd
                                     else f"{cmd} {remaining_args}".strip())
                     self.logger.debug(f"构造新命令: {full_command}")
-                    # 构造新的 AstrMessageEvent 对象，
-                    # 利用原事件中的 message_obj、platform_meta、session_id
-                    new_event = type(event)(
+                    # 构造新的 AstrMessageEvent 对象，传入必要的字段
+                    new_event = AstrMessageEvent(
                         message_str = full_command,
                         message_obj = event.message_obj,
                         platform_meta = event.platform_meta,
                         session_id = event.session_id
                     )
-                    new_event._alias_processed = True
+                    new_event._alias_processed = False  # 新事件未经过 alias 处理
                     await self.context.get_event_queue().put(new_event)
                 return
