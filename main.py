@@ -1,5 +1,5 @@
 from astrbot.api.all import *
-from astrbot.api.event import filter, AstrMessageEvent, EventMessageType
+from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api.message_components import MessageChain
 from typing import List, Dict, Any
