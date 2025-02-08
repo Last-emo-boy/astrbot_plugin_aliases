@@ -2,6 +2,7 @@ from astrbot.api.all import *
 from astrbot.core.log import LogManager  # 使用 LogManager 获取 logger
 from typing import List, Dict, Any
 import shlex  # 用于解析带引号的命令参数
+import copy  # 用于深拷贝事件对象
 
 @register("alias_service", "w33d", "别名管理插件", "1.0.0", "https://github.com/Last-emo-boy/astrbot_plugin_aliases")
 class AliasService(Star):
