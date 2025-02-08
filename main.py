@@ -1,8 +1,4 @@
 from astrbot.api.all import *
-from astrbot.api.event import filter, AstrMessageEvent
-from astrbot.api.star import Context, Star, register
-from astrbot.api.message_components import MessageChain
-from typing import List, Dict, Any
 
 @register("alias_service", "w33d", "", "1.0.0", "https://github.com/Last-emo-boy/astrbot_plugin_aliases")
 class AliasService(Star):
